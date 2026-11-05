@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ИС Предприятия | ERP Система</title>
+    <style>
+        :root {
+            --sidebar-bg: #1E293B; --sidebar-hover: #334155; --primary: #4F46E5;
+            --bg: #F1F5F9; --card-bg: #FFFFFF; --text: #0F172A; --text-muted: #64748B;
+            --error: #EF4444; --success: #10B981; --warning: #F59E0B;
+        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+        body { background-color: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+
+        /* --- ОБЩИЕ ЭКРАНЫ (Лендинг, Логин, Регистрация) --- */
+        .screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; display: none; align-items: center; justify-content: center; z-index: 100; overflow-y: auto; background: var(--bg); }
+        .screen.active { display: flex; }
+        
+        .auth-card { background: var(--card-bg); padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 420px; text-align: center; margin: 20px; }
+        .auth-card h2 { margin-bottom: 20px; color: var(--sidebar-bg); }
+        .form-group { margin-bottom: 15px; text-align: left; }
+        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9em; color: var(--text-muted); }
+        input, select { width: 100%; padding: 12px; border: 1px solid #CBD5E1; border-radius: 8px; outline: none; transition: 0.2s; }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+        button { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: 600; width: 100%; transition: 0.2s; font-size: 1em; }
+        button:hover { background: #4338CA; }
+        .btn-link { background: none; color: var(--primary); text-decoration: none; font-weight: 600; font-size: 0.9em; padding: 5px; width: auto; display: inline-block; }
+        .btn-link:hover { background: none; text-decoration: underline; }
+
+        /* Пазл */
+        .puzzle-container { display: grid; grid-template-columns: repeat(3, 70px); grid-template-rows: repeat(3, 70px); gap: 2px; background: #ccc; border: 2px solid #333; margin: 10px auto; cursor: pointer; width: max-content; }
+        .piece { width: 70px; height: 70px; background-size: 210px 210px; }
+        .piece.selected { box-shadow: inset 0 0 0 4px var(--error); z-index: 10; }
+
+        .alert { padding: 10px; border-radius: 8px; margin-bottom: 15px; font-size: 0.9em; display: none; }
+        .alert.error { background: #FEE2E2; color: var(--error); display: block; }
+        .alert.success { background: #D1FAE5; color: var(--success); display: block; }
+
+        /* --- ЛЕНДИНГ --- */
+        #landing-screen { background: linear-gradient(135deg, #1E293B 0%, #4F46E5 100%); color: white; }
+        .landing-content { text-align: center; max-width: 800px; padding: 20px; }
+        .landing-content h1 { font-size: 3em; margin-bottom: 20px; }
+        .landing-content p { font-size: 1.2em; margin-bottom: 40px; opacity: 0.9; line-height: 1.6; }
+        .landing-buttons { display: flex; gap: 20px; justify-content: center; }
+        .landing-buttons button { width: auto; padding: 15px 40px; font-size: 1.1em; border-radius: 30px; }
+        .landing-buttons button.outline { background: transparent; border: 2px solid white; color: white; }
+        .landing-buttons button.outline:hover { background: white; color: var(--primary); }
+        .features { display: flex; gap: 30px; justify-content: center; margin-top: 50px; flex-wrap: wrap; }
+        .feature { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px; width: 200px; backdrop-filter: blur(5px); }
+        .feature h3 { margin-bottom: 10px; font-size: 1.1em; }
+        .feature p { font-size: 0.9em; opacity: 0.8; }
+
+        /* --- ОСНОВНОЕ ПРИЛОЖЕНИЕ --- */
+        #app-screen { display: none; width: 100%; height: 100%; }
+        #app-screen.active { display: flex; }
+        .sidebar { width: 260px; background: var(--sidebar-bg); color: white; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 20px; font-size: 1.2em; font-weight: bold; border-bottom: 1px solid #334155; text-align: center; }
+        .menu { list-style: none; padding: 10px 0; flex-grow: 1; overflow-y: auto; }
+        .menu li { padding: 15px 20px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 10px; font-weight: 500; }
+        .menu li:hover { background: var(--sidebar-hover); }
+        .menu li.active { background: var(--primary); border-left: 4px solid white; }
+        .sidebar-footer { padding: 20px; border-top: 1px solid #334155; }
+
+        .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow-y: auto; }
+        .topbar { background: var(--card-bg); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .user-profile { font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .content-area { padding: 30px; }
+        
+        .section { display: none; animation: fadeIn 0.3s; }
+        .section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card { background: var(--card-bg); border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h2 { font-size: 1.5em; color: var(--sidebar-bg); }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #E2E8F0; }
+        th { background: #F8FAFC; font-weight: 600; color: var(--text-muted); font-size: 0.9em; text-transform: uppercase; }
+        tr:hover { background: #F8FAFC; }
+
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .widget { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid var(--primary); }
+        .widget h3 { font-size: 0.9em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; }
+        .widget .value { font-size: 2em; font-weight: bold; color: var(--sidebar-bg); }
+
+        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 0.85em; font-weight: bold; }
+        .status-badge.active { background: #D1FAE5; color: var(--success); }
+        .status-badge.blocked { background: #FEE2E2; color: var(--error); }
+        .btn-small { padding: 6px 12px; font-size: 0.85em; width: auto; background: var(--error); }
+    </style>
+</head>
+<body>
+
+    <!-- ЭКРАН 0: ЛЕНДИНГ (ГЛАВНАЯ) -->
+    <div id="landing-screen" class="screen active">
+        <div class="landing-content">
+            <h1>ИС Предприятия</h1>
+            <p>Современная ERP-система для автоматизации производства и продаж. Управляйте заказами, спецификациями и ресурсами в одном окне.</p>
+            <div class="landing-buttons">
+                <button onclick="showScreen('login-screen')">Войти в систему</button>
+                <button class="outline" onclick="showScreen('register-screen')">Регистрация</button>
+            </div>
+            <div class="features">
+                <div class="feature"><h3>📦 Заказы</h3><p>Полный контроль над заказами покупателей и производством.</p></div>
+                <div class="feature"><h3>📋 Спецификации</h3><p>Автоматический расчет себестоимости продукции.</p></div>
+                <div class="feature"><h3>👥 Пользователи</h3><p>Гибкая система ролей и защита от ботов.</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН 1: АВТОРИЗАЦИЯ -->
+    <div id="login-screen" class="screen">
+        <div class="auth-card">
+            <h2>Вход в систему</h2>
+            <div id="login-alert" class="alert"></div>
+            <div class="form-group"><label>Логин</label><input type="text" id="login-input" placeholder="Введите логин"></div>
+            <div class="form-group"><label>Пароль</label><input type="password" id="password-input" placeholder="Введите пароль"></div>
+            <div class="form-group"><label>Капча (Соберите пазл)</label><div id="login-puzzle" class="puzzle-container"></div></div>
+            <button onclick="doLogin()">Войти</button>
+            <div style="margin-top: 15px; display: flex; justify-content: space-between;">
+                <button class="btn-link" onclick="showScreen('landing-screen')">← На главную</button>
+                <button class="btn-link" onclick="showScreen('register-screen')">Нет аккаунта? Регистрация</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН 2: РЕГИСТРАЦИЯ -->
+    <div id="register-screen" class="screen">
+        <div class="auth-card">
+            <h2>Регистрация</h2>
+            <div id="register-alert" class="alert"></div>
+            <div class="form-group"><label>ФИО</label><input type="text" id="reg-name" placeholder="Иванов Иван Иванович"></div>
+            <div class="form-group"><label>Логин</label><input type="text" id="reg-login" placeholder="Придумайте логин"></div>
+            <div class="form-group"><label>Пароль</label><input type="password" id="reg-password" placeholder="Минимум 8 символов"></div>
+            <div class="form-group"><label>Капча (Соберите пазл)</label><div id="register-puzzle" class="puzzle-container"></div></div>
+            <button onclick="doRegister()">Зарегистрироваться</button>
+            <div style="margin-top: 15px; display: flex; justify-content: space-between;">
+                <button class="btn-link" onclick="showScreen('landing-screen')">← На главную</button>
+                <button class="btn-link" onclick="showScreen('login-screen')">Уже есть аккаунт? Войти</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ЭКРАН 3: ПРИЛОЖЕНИЕ -->
+    <div id="app-screen">
+        <aside class="sidebar">
+            <div class="sidebar-header">ИС Предприятия</div>
+            <ul class="menu">
+                <li id="menu-dashboard" class="active" onclick="switchTab('dashboard')">📊 Дашборд</li>
+                <li id="menu-orders" onclick="switchTab('orders')">📦 Заказы покупателей</li>
+                <li id="menu-production" onclick="switchTab('production')">🏭 Заказы на производство</li>
+                <li id="menu-specifications" onclick="switchTab('specifications')">📋 Спецификации</li>
+                <li id="menu-resources" onclick="switchTab('resources')">🔧 Ресурсы (Материалы)</li>
+                <li id="menu-products" onclick="switchTab('products')">🏷️ Продукция</li>
+                <li id="menu-counterparties" onclick="switchTab('counterparties')">🤝 Заказчики</li>
+                <li id="menu-notes" onclick="switchTab('notes')">📝 Заметки</li>
+                <li id="menu-users" class="hidden" onclick="switchTab('users')">👥 Пользователи</li>
+            </ul>
+            <div class="sidebar-footer"><button onclick="doLogout()" style="background: #475569;">Выйти</button></div>
+        </aside>
+
+        <div class="main-content">
+            <header class="topbar">
+                <div>Учебная практика 09.02.07</div>
+                <div class="user-profile">
+                    <span id="current-user-name">-</span> 
+                    <span style="color: var(--text-muted); font-size: 0.9em;" id="current-user-role">-</span>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <div id="section-dashboard" class="section active">
+                    <h2>Обзор системы</h2><br>
+                    <div class="dashboard-grid">
+                        <div class="widget"><h3>Всего заказов</h3><div class="value" id="stat-orders">0</div></div>
+                        <div class="widget" style="border-left-color: var(--success);"><h3>Заказчиков</h3><div class="value" id="stat-customers">0</div></div>
+                        <div class="widget" style="border-left-color: var(--warning);"><h3>Продукции</h3><div class="value" id="stat-products">0</div></div>
+                    </div>
+                    <div class="card"><h3>Последние заметки</h3><div id="dashboard-notes">Загрузка...</div></div>
+                </div>
+
+                <div id="section-orders" class="section">
+                    <div class="card"><div class="card-header"><h2>Заказы покупателей</h2></div>
+                        <table><thead><tr><th>№ Заказа</th><th>Дата</th><th>Заказчик</th><th>Сумма (руб.)</th><th>Статус</th></tr></thead><tbody id="orders-table-body"></tbody></table>
+                    </div>
+                </div>
+
+                <div id="section-production" class="section">
+                    <div class="card"><div class="card-header"><h2>Заказы на производство</h2></div>
+                        <table><thead><tr><th>№ Заказа</th><th>Дата запуска</th><th>Подразделение</th><th>Продукция</th><th>Кол-во</th></tr></thead><tbody id="production-table-body"></tbody></table>
+                    </div>
+                </div>
+
+                <div id="section-specifications" class="section">
+                    <div class="card"><div class="card-header"><h2>Спецификации (Нормы расхода)</h2></div>
+                        <table><thead><tr><th>Продукция</th><th>Ресурс</th><th>Норма</th><th>Ед. изм.</th><th>Цена</th><th>Стоимость</th></tr></thead><tbody id="specs-table-body"></tbody></table>
+                    </div>
+                </div>
+
+                <div id="section-resources" class="section">
+                    <div class="card"><div class="card-header"><h2>Материалы и Операции</h2></div>
+                        <table><thead><tr><th>Код</th><th>Наименование</th><th>Тип</th><th>Ед. изм.</th><th>Цена</th></tr></thead><tbody id="resources-table-body"></tbody></table>
+                    </div>
+                </div>
+
+                <div id="section-products" class="section">
+                    <div class="card"><div class="card-header"><h2>Справочник продукции</h2></div>
+                        <table><thead><tr><th>Код</th><th>Наименование</th><th>Тип</th><th>Категория</th></tr></thead><tbody id="products-table-body"></tbody></table>
+                    </div>
+                </div>
+
+                <div id="section-counterparties" class="section">
+                    <div class="card"><div class="card-header"><h2>Заказчики</h2></div>
+                        <table><thead><tr><th>Внешний ID</th><th>Наименование</th><th>ИНН</th><th>Телефон</th><th>Адрес</th></tr></thead><tbody id="customers-table-body"></tbody></table>
+                    </div>
+                </div>
+
+                <div id="section-notes" class="section">
+                    <div class="card"><div class="card-header"><h2>Системные заметки</h2></div><div id="notes-container"></div></div>
+                </div>
+
+                <div id="section-users" class="section">
+                    <div class="card">
+                        <div class="card-header"><h2>Управление пользователями</h2></div>
+                        <div class="alert" id="admin-alert"></div>
+                        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                            <input type="text" id="new-user-name" placeholder="ФИО">
+                            <input type="text" id="new-user-login" placeholder="Логин">
+                            <input type="password" id="new-user-pass" placeholder="Пароль">
+                            <select id="new-user-role"><option value="Пользователь">Пользователь</option><option value="Администратор">Администратор</option></select>
+                            <button style="width: auto;" onclick="createUser()">Добавить</button>
+                        </div>
+                        <table><thead><tr><th>ФИО</th><th>Логин</th><th>Роль</th><th>Статус</th><th>Действия</th></tr></thead><tbody id="users-table-body"></tbody></table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const API_URL = 'http://127.0.0.1:8000';
+    let token = localStorage.getItem('token');
+    let currentRole = '';
+
+    // --- УПРАВЛЕНИЕ ЭКРАНАМИ ---
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+        document.getElementById('app-screen').classList.remove('active');
+
+        // Сброс алертов
+        document.querySelectorAll('.alert').forEach(el => el.className = 'alert');
+
+        // Если перешли на логин или регистрацию — грузим новую капчу
+        if (screenId === 'login-screen') loadCaptcha('login-puzzle');
+        if (screenId === 'register-screen') loadCaptcha('register-puzzle');
+    }
+
+    // --- КАПЧА (Универсальная функция) ---
+    let captchaData = {
+        'login': { id: '', order: [], selected: null },
+        'register': { id: '', order: [], selected: null }
+    };
+
+    async function loadCaptcha(containerId) {
+        const type = containerId === 'login-puzzle' ? 'login' : 'register';
+        try {
+            const res = await fetch(`${API_URL}/captcha/challenge`);
+            const data = await res.json();
+            captchaData[type].id = data.challenge_id;
+            captchaData[type].order = data.pieces;
+            captchaData[type].selected = null;
+            renderPuzzle(containerId, type);
+        } catch (e) { console.error('Ошибка капчи', e); }
+    }
+
+    function renderPuzzle(containerId, type) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        
+        const canvas = document.createElement('canvas'); canvas.width = 210; canvas.height = 210;
+        const ctx = canvas.getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 210, 210);
+        gradient.addColorStop(0, '#4F46E5'); gradient.addColorStop(1, '#EC4899');
+        ctx.fillStyle = gradient; ctx.fillRect(0, 0, 210, 210);
+        ctx.fillStyle = '#FFF'; ctx.beginPath(); ctx.arc(105, 105, 50, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#F59E0B'; ctx.beginPath(); ctx.arc(35, 35, 25, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(175, 175, 25, 0, Math.PI * 2); ctx.fill();
+        const imgUrl = canvas.toDataURL();
+
+        captchaData[type].order.forEach((pieceId, index) => {
+            const div = document.createElement('div'); div.className = 'piece';
+            if (captchaData[type].selected === index) div.classList.add('selected');
+            div.style.backgroundImage = `url(${imgUrl})`;
+            div.style.backgroundPosition = `-${(pieceId % 3) * 70}px -${Math.floor(pieceId / 3) * 70}px`;
+            div.onclick = () => {
+                if (captchaData[type].selected === null) captchaData[type].selected = index;
+                else {
+                    const temp = captchaData[type].order[captchaData[type].selected];
+                    captchaData[type].order[captchaData[type].selected] = captchaData[type].order[index];
+                    captchaData[type].order[index] = temp;
+                    captchaData[type].selected = null;
+                }
+                renderPuzzle(containerId, type);
+            };
+            container.appendChild(div);
+        });
+    }
+
+    // --- АВТОРИЗАЦИЯ ---
+    async function doLogin() {
+        const login = document.getElementById('login-input').value;
+        const password = document.getElementById('password-input').value;
+        if (!login || !password) return showAlert('login-alert', 'Заполните все поля', 'error');
+
+        try {
+            // Проверка пазла
+            const cRes = await fetch(`${API_URL}/captcha/verify`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ challenge_id: captchaData['login'].id, user_order: captchaData['login'].order.join(',') })
+            });
+            if (!cRes.ok) {
+                showAlert('login-alert', 'Пазл собран неверно!', 'error'); loadCaptcha('login-puzzle'); return;
+            }
+
+            // Логин
+            const lRes = await fetch(`${API_URL}/auth/login`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ login, password })
+            });
+            const lData = await lRes.json();
+            if (!lRes.ok) {
+                showAlert('login-alert', lData.detail, 'error'); loadCaptcha('login-puzzle'); return;
+            }
+
+            token = lData.access_token; localStorage.setItem('token', token); loadMainScreen();
+        } catch (e) { showAlert('login-alert', 'Ошибка сервера', 'error'); }
+    }
+
+    // --- РЕГИСТРАЦИЯ ---
+    async function doRegister() {
+        const full_name = document.getElementById('reg-name').value.trim();
+        const login = document.getElementById('reg-login').value.trim();
+        const password = document.getElementById('reg-password').value;
+        
+        if (!full_name || !login || !password) return showAlert('register-alert', 'Заполните все поля', 'error');
+        if (password.length < 8) return showAlert('register-alert', 'Пароль должен быть не менее 8 символов', 'error');
+
+        try {
+            // 1. Проверяем пазл
+            const cRes = await fetch(`${API_URL}/captcha/verify`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ challenge_id: captchaData['register'].id, user_order: captchaData['register'].order.join(',') })
+            });
+            if (!cRes.ok) {
+                showAlert('register-alert', 'Пазл собран неверно!', 'error'); loadCaptcha('register-puzzle'); return;
+            }
+            const cData = await cRes.json();
+            const captchaToken = cData.captcha_token;
+
+            // 2. Отправляем данные регистрации
+            const rRes = await fetch(`${API_URL}/auth/register`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ full_name, login, password, captcha_token: captchaToken })
+            });
+            const rData = await rRes.json();
+            
+            if (!rRes.ok) {
+                showAlert('register-alert', rData.detail || 'Ошибка регистрации', 'error'); 
+                loadCaptcha('register-puzzle'); 
+                return;
+            }
+
+            // Успех!
+            showAlert('register-alert', 'Регистрация успешна! Теперь вы можете войти.', 'success');
+            setTimeout(() => {
+                document.getElementById('login-input').value = login;
+                showScreen('login-screen');
+            }, 1500);
+
+        } catch (e) { showAlert('register-alert', 'Ошибка сервера', 'error'); }
+    }
+
+    function doLogout() {
+        localStorage.removeItem('token'); token = null;
+        document.getElementById('app-screen').classList.remove('active');
+        showScreen('landing-screen');
+    }
+
+    // --- ОСНОВНОЕ ПРИЛОЖЕНИЕ ---
+    async function loadMainScreen() {
+        try {
+            const res = await fetch(`${API_URL}/auth/me`, { headers: {'Authorization': `Bearer ${token}`} });
+            if (!res.ok) throw new Error();
+            const user = await res.json(); currentRole = user.role;
+
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            document.getElementById('app-screen').classList.add('active');
+            document.getElementById('current-user-name').innerText = user.full_name;
+            document.getElementById('current-user-role').innerText = `(${user.role})`;
+
+            if (currentRole === 'Администратор') document.getElementById('menu-users').classList.remove('hidden');
+            loadDashboardData();
+        } catch (e) { doLogout(); }
+    }
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.menu li').forEach(el => el.classList.remove('active'));
+        document.getElementById(`menu-${tabId}`).classList.add('active');
+        document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+        document.getElementById(`section-${tabId}`).classList.add('active');
+
+        if (tabId === 'orders') loadOrders();
+        if (tabId === 'production') loadProduction();
+        if (tabId === 'specifications') loadSpecifications();
+        if (tabId === 'resources') loadResources();
+        if (tabId === 'products') loadProducts();
+        if (tabId === 'counterparties') loadCustomers();
+        if (tabId === 'notes') loadNotes();
+        if (tabId === 'users') loadUsers();
+    }
+
+    // --- ЗАГРУЗКА ВСЕХ ТАБЛИЦ ---
+    async function loadDashboardData() {
+        const [o, c, p, n] = await Promise.all([
+            fetch(`${API_URL}/orders`).then(r => r.json()), fetch(`${API_URL}/counterparties`).then(r => r.json()),
+            fetch(`${API_URL}/products`).then(r => r.json()), fetch(`${API_URL}/notes`).then(r => r.json())
+        ]);
+        document.getElementById('stat-orders').innerText = o.length;
+        document.getElementById('stat-customers').innerText = c.length;
+        document.getElementById('stat-products').innerText = p.length;
+        document.getElementById('dashboard-notes').innerHTML = n.slice(0,3).map(x => `<div style="margin-bottom:10px;"><b>${x.title_user}</b><br><span style="color:#666;font-size:0.9em">${x.content}</span></div>`).join('') || '<p>Нет заметок</p>';
+    }
+
+    async function loadOrders() {
+        const data = await fetch(`${API_URL}/orders`).then(r => r.json());
+        document.getElementById('orders-table-body').innerHTML = data.map(o => `<tr><td><b>${o.order_number}</b></td><td>${new Date(o.order_date).toLocaleDateString('ru-RU')}</td><td>${o.customer_name}</td><td style="font-weight:bold;color:var(--success)">${Number(o.total_sum).toLocaleString('ru-RU')} ₽</td><td><span style="background:#E0E7FF;color:#4338CA;padding:4px 8px;border-radius:4px;font-size:0.85em">${o.status}</span></td></tr>`).join('');
+    }
+
+    async function loadProduction() {
+        const data = await fetch(`${API_URL}/production-orders`).then(r => r.json());
+        document.getElementById('production-table-body').innerHTML = data.map(p => `<tr><td><b>${p.order_number}</b></td><td>${new Date(p.launch_date).toLocaleDateString('ru-RU')}</td><td>${p.department}</td><td>${p.product_name || '-'}</td><td>${p.quantity || 0} шт.</td></tr>`).join('');
+    }
+
+    async function loadSpecifications() {
+        const data = await fetch(`${API_URL}/specifications`).then(r => r.json());
+        document.getElementById('specs-table-body').innerHTML = data.map(s => `<tr><td><b>${s.product_name}</b></td><td>${s.resource_name}</td><td>${s.norm_quantity}</td><td>${s.metric_unit}</td><td>${s.unit_price} ₽</td><td style="font-weight:bold">${s.cost} ₽</td></tr>`).join('');
+    }
+
+    async function loadResources() {
+        const data = await fetch(`${API_URL}/resources`).then(r => r.json());
+        document.getElementById('resources-table-body').innerHTML = data.map(r => `<tr><td>${r.code}</td><td><b>${r.name}</b></td><td><span class="status-badge ${r.resource_kind === 'Материал' ? 'active' : 'blocked'}">${r.resource_kind}</span></td><td>${r.metric_unit}</td><td>${r.unit_price} ₽</td></tr>`).join('');
+    }
+
+    async function loadProducts() {
+        const data = await fetch(`${API_URL}/products`).then(r => r.json());
+        document.getElementById('products-table-body').innerHTML = data.map(p => `<tr><td>${p.code}</td><td><b>${p.name}</b></td><td>Готовая продукция</td><td>Мебель</td></tr>`).join('');
+    }
+
+    async function loadCustomers() {
+        const data = await fetch(`${API_URL}/counterparties`).then(r => r.json());
+        document.getElementById('customers-table-body').innerHTML = data.map(c => `<tr><td>${c.external_id || '-'}</td><td><b>${c.name}</b></td><td>${c.inn || '-'}</td><td>${c.phone || '-'}</td><td>${c.address || '-'}</td></tr>`).join('');
+    }
+
+    async function loadNotes() {
+        const data = await fetch(`${API_URL}/notes`).then(r => r.json());
+        document.getElementById('notes-container').innerHTML = data.map(n => `<div class="list-item"><div class="list-item-title">${n.title_user}</div><div>${n.content}</div><div class="list-item-meta">Дата: ${n.formatted_date}</div></div>`).join('') || '<p>Нет заметок</p>';
+    }
+
+    async function loadUsers() {
+        const data = await fetch(`${API_URL}/admin/users`, { headers: {'Authorization': `Bearer ${token}`} }).then(r => r.json());
+        document.getElementById('users-table-body').innerHTML = data.map(u => `<tr><td>${u.full_name}</td><td>${u.login}</td><td>${u.role}</td><td><span class="status-badge ${u.is_blocked ? 'blocked' : 'active'}">${u.is_blocked ? 'Заблокирован' : 'Активен'}</span></td><td>${u.is_blocked ? `<button class="btn-small" onclick="unblockUser(${u.id_user})">Разблокировать</button>` : '-'}</td></tr>`).join('');
+    }
+
+    async function createUser() {
+        const full_name = document.getElementById('new-user-name').value;
+        const login = document.getElementById('new-user-login').value;
+        const password = document.getElementById('new-user-pass').value;
+        const role = document.getElementById('new-user-role').value;
+        if (!full_name || !login || !password) return showAlert('admin-alert', 'Заполните поля', 'error');
+        const res = await fetch(`${API_URL}/admin/users`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ full_name, login, password, role })
+        });
+        if (!res.ok) { const d = await res.json(); return showAlert('admin-alert', d.detail, 'error'); }
+        showAlert('admin-alert', 'Пользователь создан!', 'success');
+        document.getElementById('new-user-name').value = ''; document.getElementById('new-user-login').value = ''; document.getElementById('new-user-pass').value = '';
+        loadUsers();
+    }
+
+    async function unblockUser(id) {
+        const res = await fetch(`${API_URL}/admin/users/${id}/unblock`, { method: 'PATCH', headers: {'Authorization': `Bearer ${token}`} });
+        if (res.ok) loadUsers();
+    }
+
+    function showAlert(id, msg, type) {
+        const el = document.getElementById(id); el.innerText = msg; el.className = `alert ${type}`;
+        setTimeout(() => el.className = 'alert', 4000);
+    }
+
+    // Инициализация
+    window.onload = () => {
+        if (token) loadMainScreen();
+        else showScreen('landing-screen');
+    };
+</script>
+</body>
+</html>
